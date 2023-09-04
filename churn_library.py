@@ -11,6 +11,16 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import matplotlib.image as mpimg
 
+from sklearn.preprocessing import normalize
+from sklearn.model_selection import train_test_split
+
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import GridSearchCV
+
+from sklearn.metrics import classification_report
+
+
 os.environ['QT_QPA_PLATFORM']='offscreen'
 
 
@@ -38,6 +48,7 @@ def perform_eda(df):
             None
     '''
     df['Churn'] = df['Attrition_Flag'].apply(lambda val: 0 if val == "Existing Customer" else 1)
+    df_numeric = df.select_dtypes(include=[np.number])
     plt.figure(figsize=(20,10)) 
     churn_plot = df['Churn'].hist()  
     plt.savefig("./images/eda/churn_plot.png", dpi=300)
@@ -55,7 +66,7 @@ def perform_eda(df):
     plt.savefig("./images/eda/transaction_plot.png", dpi=300)
     
     plt.figure(figsize=(20,10)) 
-    corr_plot = sns.heatmap(df.corr(), annot=False, cmap='Dark2_r', linewidths = 2)
+    corr_plot = sns.heatmap(df_numeric.corr(), annot=False, cmap='Dark2_r', linewidths = 2)
     plt.savefig("./images/eda/heatmap_plot.png", dpi=300)
 
 def encoder_helper(df, category_lst, response):
@@ -74,13 +85,13 @@ def encoder_helper(df, category_lst, response):
     df['Churn'] = df['Attrition_Flag'].apply(lambda val: 0 if val == "Existing Customer" else 1)
     for cat in category_lst:
         col_name = f'{cat}_Churn'
-        df[col_name] = df[cat].map(df.groupby(cat).mean()['Churn'])
+        df[col_name] = df[cat].map(df.groupby(cat)['Churn'].mean())
     df = df[response]
     return df
         
 
 
-def perform_feature_engineering(df, response):
+def perform_feature_engineering(df):
     '''
     input:
               df: pandas dataframe
@@ -93,9 +104,10 @@ def perform_feature_engineering(df, response):
               y_test: y testing data
     '''
     y = df['Churn']
-    X = df.drop(['Churn'], axis = 1, inplace = True)
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size= 0.3, random_state=42)
-    return X_train, X_test, y_train, y_test
+    x = df.drop(['Churn'], axis = 1)
+    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size= 0.3, random_state=42)
+
+    return x_train, x_test, y_train, y_test
 
     
     
@@ -147,21 +159,42 @@ def train_models(X_train, X_test, y_train, y_test):
     output:
               None
     '''
-#     rfc = RandomForestClassifier(random_state=42)
-#     lrc = LogisticRegression(solver='lbfgs', max_iter=3000)
-#     param_grid = { 
-#     'n_estimators': [200, 500],
-#     'max_features': ['auto', 'sqrt'],
-#     'max_depth' : [4,5,100],
-#     'criterion' :['gini', 'entropy']
-#      }
-#     cv_rfc = GridSearchCV(estimator=rfc, param_grid=param_grid, cv=5)
-#     cv_rfc.fit(X_train, y_train)
+    rfc = RandomForestClassifier(random_state=42)
+    lrc = LogisticRegression(solver='lbfgs', max_iter=3000)
+    param_grid = {
+    'n_estimators': [200, 500],
+    'max_features': ['auto', 'sqrt'],
+    'max_depth' : [4,5,100],
+    'criterion' :['gini', 'entropy']
+     }
+    cv_rfc = GridSearchCV(estimator=rfc, param_grid=param_grid, cv=5)
+    cv_rfc.fit(X_train, y_train)
 
-#     lrc.fit(X_train, y_train)
+    lrc.fit(X_train, y_train)
 
-#     y_train_preds_rf = cv_rfc.best_estimator_.predict(X_train)
-#     y_test_preds_rf = cv_rfc.best_estimator_.predict(X_test)
+    y_train_preds_rf = cv_rfc.best_estimator_.predict(X_train)
+    y_test_preds_rf = cv_rfc.best_estimator_.predict(X_test)
 
-#     y_train_preds_lr = lrc.predict(X_train)
-#     y_test_preds_lr = lrc.predict(X_test)
+    y_train_preds_lr = lrc.predict(X_train)
+    y_test_preds_lr = lrc.predict(X_test)
+
+    importances = cv_rfc.best_estimator_.feature_importances_
+    # Sort feature importances in descending order
+    indices = np.argsort(importances)[::-1]
+
+    # Rearrange feature names so they match the sorted feature importances
+    names = [X_train.columns[i] for i in indices]
+
+    # Create plot
+    plt.figure(figsize=(20, 5))
+
+    # Create plot title
+    plt.title("Feature Importance")
+    plt.ylabel('Importance')
+
+    # Add bars
+    plt.bar(range(X_train.shape[1]), importances[indices])
+
+    # Add feature names as x-axis labels
+    plt.xticks(range(X_train.shape[1]), names, rotation=90)
+    plt.savefig("./images/eda/importance.png", dpi=300)

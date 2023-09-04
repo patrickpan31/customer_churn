@@ -5,7 +5,7 @@ import logging
 from churn_library import *
 
 logging.basicConfig(
-    filename='./logs/churn_library.log',
+	filename='test_log.txt',
     level = logging.INFO,
     filemode='w',
     format='%(name)s - %(levelname)s - %(message)s')
@@ -71,7 +71,7 @@ def keep_lst():
 				'Avg_Open_To_Buy', 'Total_Amt_Chng_Q4_Q1', 'Total_Trans_Amt',
 				'Total_Trans_Ct', 'Total_Ct_Chng_Q4_Q1', 'Avg_Utilization_Ratio',
 				'Gender_Churn', 'Education_Level_Churn', 'Marital_Status_Churn', 
-				'Income_Category_Churn', 'Card_Category_Churn']
+				'Income_Category_Churn', 'Card_Category_Churn','Churn']
 	return keep_cols
 
 def test_encoder_helper(df, cat_lst, keep_lst):
@@ -85,9 +85,9 @@ def test_encoder_helper(df, cat_lst, keep_lst):
 
     
 @pytest.fixture
-def new_df():
-    nedw_data = encoder_helper(df,cat_lst,keep_lst)
-    return nedw_data
+def new_df(df,cat_lst,keep_lst):
+    new_data = encoder_helper(df,cat_lst,keep_lst)
+    return new_data
 
 
 def test_perform_feature_engineering(new_df):
@@ -95,24 +95,30 @@ def test_perform_feature_engineering(new_df):
 	test perform_feature_engineering
 	'''
 	try:
-		X_train, X_test, y_train, y_test = perform_feature_engineering(new_df, None)
+		x_train, x_test, y_train, y_test = perform_feature_engineering(new_df)
+		assert x_train.shape[0] == y_train.shape[0]
+		assert x_test.shape[0] == y_test.shape[0]
 		logging.info('SUCCESS: FUNCTION WORKS')
-	except:
-		logging.error("ERROR: FUNCTION FAILED")
-    
-	assert X_train.shape[0] == y_train.shape[0]
-	assert X_test.shape[0] == y_test.shape[0]
+	except Exception as e:
+		logging.error(f"ERROR: FUNCTION FAILED due to {str(e)}")
+		raise e  # This will allow you to see the actual exception.
 
-def test_train_models(train_models):
+@pytest.fixture
+def train_split(new_df):
+    x_train, x_test, y_train, y_test = perform_feature_engineering(new_df)
+    return x_train, x_test, y_train, y_test
+
+def test_train_models(train_split):
 	'''
 	test train_models
 	'''
+	train_models(*train_split)
+	try:
+		img1 = mpimg.imread("./images/eda/importance.png")
+	except FileNotFoundError as err:
+		logging.error("ERROR: EAD FAILED, NO PLOT GENERATED")
+		raise err
 
-
-# if __name__ == "__main__":
-# 	test_import(import_data)
-# 	df = import_data("./data/bank_data.csv")
-# 	test_eda(perform_eda)
 
 
 
